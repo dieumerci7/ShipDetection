@@ -8,12 +8,10 @@ import cv2
 import matplotlib.pyplot as plt
 import tensorflow_addons as tfa
 
-# import keras.backend as K
-
 from utils.losses import dice, bce_dice_loss
 
-VALIDATION_LENGTH = 20  # 2000
-TEST_LENGTH = 20  # 2000
+VALIDATION_LENGTH = 2000
+TEST_LENGTH = 2000
 BATCH_SIZE = 32
 BUFFER_SIZE = 100
 IMG_SHAPE = (256, 256)
@@ -65,7 +63,7 @@ class UNetModel:
         # apply Decoder and establishing the skip connections
         x = self._decoder(encoder_outputs, filters_list[::-1])
 
-        # This is the last layers of the model
+        # This is the last layer of the model
         last = self._conv_blocks(num_classes, size=1)(x)
         outputs = tf.keras.activations.softmax(last)
 
@@ -146,21 +144,6 @@ class UNetModel:
         return result
 
 
-# def dice(targets, inputs, smooth=1e-6):
-#     axis = [1, 2, 3]
-#     intersection = K.sum(targets * inputs, axis=axis)
-#     return (2 * intersection + smooth) / (K.sum(targets, axis=axis) + K.sum(inputs, axis=axis) + smooth)
-#
-#
-# def bce_loss(targets, inputs, smooth=1e-6):
-#     axis = [1, 2, 3]
-#     return - K.sum(targets * tf.math.log(inputs + smooth) + (1 - targets) * tf.math.log(1 - inputs + smooth), axis=axis)
-#
-#
-# def bce_dice_loss(targets, inputs):
-#     return bce_loss(targets, inputs) - tf.math.log(dice(targets, inputs))
-
-
 def main():
     args = parse_args()
 
@@ -188,7 +171,7 @@ def main():
     def load_train_image(tensor) -> tuple:
         path = tf.get_static_value(tensor).decode("utf-8")
 
-        image_id = os.path.basename(path)  # path.split('/')[-1]
+        image_id = os.path.basename(path)
         input_image = cv2.imread(path)
         input_image = tf.image.resize(input_image, IMG_SHAPE)
         input_image = tf.cast(input_image, tf.float32) / 255.0
@@ -211,12 +194,12 @@ def main():
     images_without_ships = df['EncodedPixels'].isna().sum()
     print(f'df has {len(df) - images_without_ships} images with ships.')
 
-    IMAGES_WITHOUT_SHIPS_NUMBER = 35 # 3500
+    IMAGES_WITHOUT_SHIPS_NUMBER = 3500
 
     # reduce the number of images without ships
     images_without_ships = image_segmentation[image_segmentation['EncodedPixels'].isna()]['ImageId'].values[
                            :IMAGES_WITHOUT_SHIPS_NUMBER]
-    images_with_ships = image_segmentation[image_segmentation['EncodedPixels'].notna()]['ImageId'].values[:60] # 6000
+    images_with_ships = image_segmentation[image_segmentation['EncodedPixels'].notna()]['ImageId'].values[:6000]
     images_list = np.append(images_without_ships, images_with_ships)
 
     # remove corrupted images
@@ -273,7 +256,6 @@ def main():
     trainable_params = np.sum([np.prod(v.get_shape().as_list()) for v in model.trainable_variables])
     print(f'Trainable params: {trainable_params}')
 
-    # tf.keras.utils.plot_model(model, show_shapes=True)
     print(model.summary())
 
     model_history = model.fit(train_batches,
@@ -309,8 +291,8 @@ def main():
     results = model.evaluate(test_batches)
     print("test loss, test dice:", results)
 
-    # Specify the file path where you want to save the model
-    hdf5_path = './models/mymodel.h5'
+    # Specify the file path to save the model
+    hdf5_path = './models/model.h5'
 
     # Save the model as an HDF5 file
     model.save(hdf5_path, save_format='h5')
